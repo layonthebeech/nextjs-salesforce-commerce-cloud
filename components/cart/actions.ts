@@ -8,13 +8,13 @@ import {
   removeFromCart,
   updateCart,
 } from "lib/sfcc";
-import { updateTag } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export async function addItem(
   prevState: any,
-  selectedVariantId: string | undefined,
+  selectedVariantId: string | undefined
 ) {
   if (!selectedVariantId) {
     return "Error adding item to cart";
@@ -22,7 +22,7 @@ export async function addItem(
 
   try {
     await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }]);
-    updateTag(TAGS.cart);
+    revalidateTag(TAGS.cart, "max");
   } catch (e) {
     return "Error adding item to cart";
   }
@@ -37,12 +37,12 @@ export async function removeItem(prevState: any, merchandiseId: string) {
     }
 
     const lineItem = cart.lines.find(
-      (line) => line.merchandise.id === merchandiseId,
+      (line) => line.merchandise.id === merchandiseId
     );
 
     if (lineItem && lineItem.id) {
       await removeFromCart([lineItem.id]);
-      updateTag(TAGS.cart);
+      revalidateTag(TAGS.cart, "max");
     } else {
       return "Item not found in cart";
     }
@@ -56,7 +56,7 @@ export async function updateItemQuantity(
   payload: {
     merchandiseId: string;
     quantity: number;
-  },
+  }
 ) {
   const { merchandiseId, quantity } = payload;
 
@@ -68,7 +68,7 @@ export async function updateItemQuantity(
     }
 
     const lineItem = cart.lines.find(
-      (line) => line.merchandise.id === merchandiseId,
+      (line) => line.merchandise.id === merchandiseId
     );
 
     if (lineItem && lineItem.id) {
@@ -88,7 +88,7 @@ export async function updateItemQuantity(
       await addToCart([{ merchandiseId, quantity }]);
     }
 
-    updateTag(TAGS.cart);
+    revalidateTag(TAGS.cart, "max");
   } catch (e) {
     console.error(e);
     return "Error updating item quantity";
