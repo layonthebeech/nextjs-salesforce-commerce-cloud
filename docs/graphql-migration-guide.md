@@ -496,11 +496,136 @@ export function AddToCartButton({ productId }: Props) {
 }
 ```
 
+## Static Site Generation with GraphQL
+
+For fully static sites, you can execute GraphQL queries directly at build time without needing an HTTP server. This approach:
+
+- Fetches data during `next build`
+- Generates static HTML with embedded data
+- No runtime GraphQL server needed
+- Works with static hosting (CDN, S3, etc.)
+
+### Architecture
+
+```
+Build Time:
+┌─────────────────────────────────────────────────────────────┐
+│  next build                                                  │
+│       │                                                      │
+│       ▼                                                      │
+│  GraphQL Schema (in-process)                                 │
+│       │                                                      │
+│       ▼                                                      │
+│  Resolvers → SFCC REST API                                   │
+│       │                                                      │
+│       ▼                                                      │
+│  Static HTML files with embedded data                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Setup
+
+**1. Create the GraphQL schema (`lib/graphql/schema.ts`):**
+
+```typescript
+import { makeExecutableSchema } from "@graphql-tools/schema";
+import { getCollectionProducts, getProduct } from "lib/sfcc";
+
+const typeDefs = `
+  type Product {
+    id: ID!
+    title: String!
+    handle: String!
+    # ... your schema
+  }
+
+  type Query {
+    product(id: ID!): Product
+    products(collection: String): [Product!]!
+  }
+`;
+
+const resolvers = {
+  Query: {
+    product: async (_, { id }) => getProduct(id),
+    products: async (_, { collection }) => 
+      getCollectionProducts({ collection: collection || "mens" }),
+  },
+};
+
+export const schema = makeExecutableSchema({ typeDefs, resolvers });
+```
+
+**2. Create a direct executor (`lib/graphql/execute.ts`):**
+
+```typescript
+import { DocumentNode, execute } from "graphql";
+import { schema } from "./schema";
+
+export async function executeGraphQL<TData>(
+  query: DocumentNode,
+  variables?: Record<string, unknown>
+): Promise<TData> {
+  const result = await execute({
+    schema,
+    document: query,
+    variableValues: variables,
+  });
+
+  if (result.errors) {
+    throw new Error(result.errors.map((e) => e.message).join(", "));
+  }
+
+  return result.data as TData;
+}
+```
+
+**3. Use in pages (no HTTP fetch needed):**
+
+```tsx
+import { gql } from "graphql-tag";
+import { executeGraphQL } from "lib/graphql/execute";
+
+const GET_PRODUCTS = gql`
+  query GetProducts($collection: String) {
+    products(collection: $collection) {
+      id
+      title
+      handle
+    }
+  }
+`;
+
+// This runs at BUILD TIME - generates static HTML
+export default async function ProductsPage() {
+  const data = await executeGraphQL(GET_PRODUCTS, {
+    collection: "mens",
+  });
+
+  return (
+    <div>
+      {data.products.map((product) => (
+        <div key={product.id}>{product.title}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Key Difference from HTTP Approach
+
+| Approach | How it works | When to use |
+|----------|--------------|-------------|
+| **HTTP fetch** (`/api/graphql`) | Fetches via HTTP at runtime | Dynamic pages, client-side updates |
+| **Direct execution** (`executeGraphQL`) | Executes in-process at build time | Static sites, SSG |
+
+Both approaches use the same GraphQL schema and queries - only the execution method differs.
+
 ## Quick Reference
 
 | Apollo Client | Server-Side Equivalent |
 |---------------|------------------------|
-| `useQuery(QUERY, { variables })` | `await fetchGraphQL(QUERY, variables)` |
+| `useQuery(QUERY, { variables })` | `await executeGraphQL(QUERY, variables)` |
 | `useMutation(MUTATION)` | Server Action with `fetch` |
 | `loading` state | Not needed (use Suspense if desired) |
 | `error` state | Error boundary or try-catch |

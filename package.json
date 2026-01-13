@@ -11,7 +11,7 @@
   "dependencies": {
     "@apollo/client": "^4.0.12",
     "@apollo/server": "^5.2.0",
-    "@as-integrations/next": "^4.1.0",
+    "@graphql-tools/schema": "^10.0.31",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-checkbox": "^1.1.4",

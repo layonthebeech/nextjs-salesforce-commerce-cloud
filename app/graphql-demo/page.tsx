@@ -1,5 +1,5 @@
-import { print } from "graphql";
 import { gql } from "graphql-tag";
+import { executeGraphQL } from "lib/graphql/execute";
 import Link from "next/link";
 
 // The same GraphQL query structure the customer is familiar with
@@ -25,37 +25,6 @@ const GET_PRODUCTS = gql`
   }
 `;
 
-// Server-side GraphQL fetch - no Apollo Client needed!
-async function fetchGraphQL<T>(
-  query: ReturnType<typeof gql>,
-  variables?: Record<string, unknown>
-): Promise<T> {
-  // In production, use absolute URL or environment variable
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
-
-  const response = await fetch(`${baseUrl}/api/graphql`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      query: print(query),
-      variables,
-    }),
-  });
-
-  const json = await response.json();
-
-  if (json.errors) {
-    console.error("GraphQL errors:", json.errors);
-    throw new Error(json.errors[0]?.message || "GraphQL error");
-  }
-
-  return json.data;
-}
-
 type Product = {
   id: string;
   title: string;
@@ -75,25 +44,26 @@ type Product = {
 };
 
 export default async function GraphQLDemoPage() {
-  // Server-side data fetching - this runs on the server, not in the browser!
-  const data = await fetchGraphQL<{ products: Product[] }>(GET_PRODUCTS, {
-    collection: "mens", // Using "mens" collection from SFCC
+  // Direct GraphQL execution - works at BUILD TIME for static generation!
+  // No HTTP fetch, no running server needed.
+  const data = await executeGraphQL<{ products: Product[] }>(GET_PRODUCTS, {
+    collection: "mens",
   });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       {/* Header */}
-      <div className="mb-8 rounded-lg border border-blue-200 bg-blue-50 p-6">
-        <h1 className="mb-2 text-3xl font-bold text-blue-900">
-          GraphQL Demo - Server-Side Fetching
+      <div className="mb-8 rounded-lg border border-green-200 bg-green-50 p-6">
+        <h1 className="mb-2 text-3xl font-bold text-green-900">
+          GraphQL Demo - Static Generation
         </h1>
-        <p className="text-blue-700">
-          This page demonstrates GraphQL queries executed <strong>on the server</strong>. 
-          No Apollo Client bundle is sent to the browser. The data below was fetched 
-          server-side using the same GraphQL query syntax you&apos;re already using.
+        <p className="text-green-700">
+          This page uses GraphQL queries executed at <strong>build time</strong>.
+          The data is fetched during static generation - no runtime server needed.
+          This page is fully static HTML with embedded data.
         </p>
-        <div className="mt-4 rounded bg-blue-100 p-3 font-mono text-sm text-blue-800">
-          <strong>How it works:</strong> React Server Component → GraphQL API Route → SFCC REST API
+        <div className="mt-4 rounded bg-green-100 p-3 font-mono text-sm text-green-800">
+          <strong>How it works:</strong> Build Time → GraphQL Schema → Resolvers → SFCC REST API → Static HTML
         </div>
       </div>
 
@@ -112,7 +82,7 @@ export default async function GraphQLDemoPage() {
 
       {/* Products Grid */}
       <h2 className="mb-4 text-xl font-semibold">
-        Products ({data.products.length} loaded via GraphQL)
+        Products ({data.products.length} loaded via GraphQL at build time)
       </h2>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -142,7 +112,7 @@ export default async function GraphQLDemoPage() {
                 {product.title}
               </h3>
 
-              <p className="mb-2 text-lg font-bold text-blue-600">
+              <p className="mb-2 text-lg font-bold text-green-600">
                 {new Intl.NumberFormat("en-US", {
                   style: "currency",
                   currency: product.priceRange.minVariantPrice.currencyCode,
@@ -162,7 +132,7 @@ export default async function GraphQLDemoPage() {
 
                 <Link
                   href={`/product/${product.handle}`}
-                  className="text-sm font-medium text-blue-600 hover:underline"
+                  className="text-sm font-medium text-green-600 hover:underline"
                 >
                   View Details →
                 </Link>
@@ -176,7 +146,7 @@ export default async function GraphQLDemoPage() {
       <div className="mt-8">
         <Link
           href="/"
-          className="text-blue-600 hover:underline"
+          className="text-green-600 hover:underline"
         >
           ← Back to Home
         </Link>
